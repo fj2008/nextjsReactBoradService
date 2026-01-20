@@ -15,6 +15,7 @@ const DEFAULT_MENU_ITEMS: MenuItem[] = [
   { id: 'home', label: '홈', href: '/', icon: '🏠' },
   { id: 'posts', label: '게시판', href: '/posts', icon: '📋' },
   { id: 'write', label: '글쓰기', href: '/posts/write', icon: '✏️' },
+  { id: 'api-test', label: 'API 테스트', href: '/api-test', icon: '🔧' }, 
 ];
 
 export const BaseLayout: React.FC<BaseLayoutProps> = ({
