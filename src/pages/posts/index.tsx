@@ -1,40 +1,24 @@
 // src/pages/posts/index.tsx
 import type { ReactElement } from 'react';
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/router';
 import { BaseLayout } from '@layouts/index';
 import { Button } from '@components/atoms';
 import { SearchBar } from '@components/molecules';
 import { Table, Pagination, TableColumn } from '@components/organisms';
-
-// 게시글 타입
-interface Post {
-  id: number;
-  title: string;
-  author: string;
-  createdAt: string;
-  views: number;
-}
-
-// 샘플 데이터
-const SAMPLE_POSTS: Post[] = [
-  { id: 1, title: '첫 번째 게시글입니다', author: '홍길동', createdAt: '2024-01-15', views: 150 },
-  { id: 2, title: '두 번째 게시글입니다', author: '김철수', createdAt: '2024-01-14', views: 89 },
-  { id: 3, title: '세 번째 게시글입니다', author: '이영희', createdAt: '2024-01-13', views: 234 },
-  { id: 4, title: 'React Hooks 사용법', author: '박민수', createdAt: '2024-01-12', views: 567 },
-  { id: 5, title: 'Next.js 시작하기', author: '최지은', createdAt: '2024-01-11', views: 321 },
-  { id: 6, title: 'TypeScript 기초', author: '정다운', createdAt: '2024-01-10', views: 445 },
-  { id: 7, title: 'Emotion으로 스타일링하기', author: '강미래', createdAt: '2024-01-09', views: 198 },
-  { id: 8, title: '상태관리 패턴 비교', author: '윤희망', createdAt: '2024-01-08', views: 276 },
-];
+import { useGetPosts } from '@hooks/api';
+import { usePostFilterStore } from '@store/index';
+import { Post } from '@infrastructure/api/post/types';
 
 export default function PostList(): ReactElement {
   const router = useRouter();
 
-  // 상태 관리
-  const [searchValue, setSearchValue] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  // Zustand에서 필터 상태 가져오기
+  const { keyword, page, limit, setKeyword, setPage } = usePostFilterStore();
+
+  // TanStack Query로 데이터 fetching
+  const { data, isLoading, isError } = useGetPosts({ page, limit, keyword });
 
   // 테이블 컬럼 정의
   const columns: TableColumn<Post>[] = [
@@ -60,6 +44,7 @@ export default function PostList(): ReactElement {
       header: '작성일',
       width: '120px',
       align: 'center',
+      render: (row) => formatDate(row.createdAt),
     },
     {
       key: 'views',
@@ -70,11 +55,23 @@ export default function PostList(): ReactElement {
     },
   ];
 
+  // 날짜 포맷팅
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
   // 이벤트 핸들러
-  const handleSearch = useCallback((value: string): void => {
-    console.log('검색:', value);
-    setCurrentPage(1);
-  }, []);
+  const handleSearch = useCallback(
+    (value: string): void => {
+      setKeyword(value);
+    },
+    [setKeyword]
+  );
 
   const handleRowClick = useCallback(
     (row: Post): void => {
@@ -83,13 +80,25 @@ export default function PostList(): ReactElement {
     [router]
   );
 
-  const handlePageChange = useCallback((page: number): void => {
-    setCurrentPage(page);
-  }, []);
+  const handlePageChange = useCallback(
+    (newPage: number): void => {
+      setPage(newPage);
+    },
+    [setPage]
+  );
 
   const handleWriteClick = useCallback((): void => {
     router.push('/posts/write');
   }, [router]);
+
+  // 에러 처리
+  if (isError) {
+    return (
+      <BaseLayout userName="홍길동">
+        <ErrorMessage>데이터를 불러오는데 실패했습니다.</ErrorMessage>
+      </BaseLayout>
+    );
+  }
 
   return (
     <BaseLayout userName="홍길동">
@@ -100,16 +109,20 @@ export default function PostList(): ReactElement {
             글쓰기
           </Button>
         </TitleRow>
-        <Description>전체 게시글 {SAMPLE_POSTS.length}개</Description>
+        <Description>
+          {data
+            ? `전체 ${data.pagination.totalCount}개의 게시글`
+            : '게시글을 불러오는 중...'}
+        </Description>
       </PageHeader>
 
       {/* 검색 영역 */}
       <SearchSection>
         <SearchBar
-          value={searchValue}
-          onChange={setSearchValue}
+          value={keyword}
+          onChange={setKeyword}
           onSearch={handleSearch}
-          placeholder="제목, 작성자 검색..."
+          placeholder="제목, 작성자, 내용 검색..."
         />
       </SearchSection>
 
@@ -117,20 +130,28 @@ export default function PostList(): ReactElement {
       <TableSection>
         <Table
           columns={columns}
-          data={SAMPLE_POSTS}
+          data={data?.posts ?? []}
           rowKey={(row) => row.id}
           onRowClick={handleRowClick}
+          isLoading={isLoading}
+          emptyMessage={
+            keyword
+              ? `'${keyword}' 검색 결과가 없습니다.`
+              : '게시글이 없습니다.'
+          }
         />
       </TableSection>
 
       {/* 페이지네이션 */}
-      <PaginationSection>
-        <Pagination
-          currentPage={currentPage}
-          totalPages={5}
-          onPageChange={handlePageChange}
-        />
-      </PaginationSection>
+      {data && data.pagination.totalPages > 1 && (
+        <PaginationSection>
+          <Pagination
+            currentPage={data.pagination.currentPage}
+            totalPages={data.pagination.totalPages}
+            onPageChange={handlePageChange}
+          />
+        </PaginationSection>
+      )}
     </BaseLayout>
   );
 }
@@ -180,4 +201,11 @@ const TitleText = styled.span`
     color: ${({ theme }) => theme.colors.primary[600]};
     text-decoration: underline;
   }
+`;
+
+const ErrorMessage = styled.div`
+  padding: ${({ theme }) => theme.spacing[8]};
+  text-align: center;
+  color: ${({ theme }) => theme.colors.error[500]};
+  font-size: ${({ theme }) => theme.typography.fontSize.lg};
 `;

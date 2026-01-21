@@ -1,19 +1,24 @@
 // src/pages/posts/write.tsx
-import type { ReactElement, ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent, ReactElement } from 'react';
 import { useState, useCallback } from 'react';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/router';
 import { BaseLayout } from '@layouts/index';
 import { Button } from '@components/atoms';
 import { FormField } from '@components/molecules';
+import { useCreatePost } from '@hooks/api';
 
 export default function PostWrite(): ReactElement {
   const router = useRouter();
+
+  // TanStack Query Mutation
+  const { mutate: createPost, isPending } = useCreatePost();
 
   // 폼 상태
   const [formData, setFormData] = useState({
     title: '',
     content: '',
+    author: '홍길동', // 실제로는 로그인 사용자 정보
   });
 
   // 입력 핸들러
@@ -43,11 +48,18 @@ export default function PostWrite(): ReactElement {
         return;
       }
 
-      console.log('제출:', formData);
-      alert('게시글이 등록되었습니다!');
-      router.push('/posts');
+      // API 호출
+      createPost(formData, {
+        onSuccess: (response) => {
+          alert(response.message);
+          router.push('/posts');
+        },
+        onError: (error) => {
+          alert(`등록 실패: ${error.message}`);
+        },
+      });
     },
-    [formData, router]
+    [formData, createPost, router]
   );
 
   // 취소 핸들러
@@ -78,6 +90,7 @@ export default function PostWrite(): ReactElement {
             value={formData.title}
             onChange={handleChange('title')}
             fullWidth
+            disabled={isPending}
           />
 
           <ContentField>
@@ -90,15 +103,21 @@ export default function PostWrite(): ReactElement {
               value={formData.content}
               onChange={handleChange('content')}
               rows={15}
+              disabled={isPending}
             />
           </ContentField>
 
           <ButtonGroup>
-            <Button type="button" variant="secondary" onClick={handleCancel}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleCancel}
+              disabled={isPending}
+            >
               취소
             </Button>
-            <Button type="submit" variant="primary">
-              등록
+            <Button type="submit" variant="primary" isLoading={isPending}>
+              {isPending ? '등록 중...' : '등록'}
             </Button>
           </ButtonGroup>
         </Form>
@@ -107,7 +126,7 @@ export default function PostWrite(): ReactElement {
   );
 }
 
-// Styled Components
+// Styled Components (이전과 동일)
 const PageHeader = styled.div`
   margin-bottom: ${({ theme }) => theme.spacing[6]};
 `;
@@ -173,6 +192,11 @@ const Textarea = styled.textarea`
 
   &::placeholder {
     color: ${({ theme }) => theme.colors.neutral[400]};
+  }
+
+  &:disabled {
+    background-color: ${({ theme }) => theme.colors.neutral[100]};
+    cursor: not-allowed;
   }
 `;
 
