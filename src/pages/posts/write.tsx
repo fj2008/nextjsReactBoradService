@@ -7,9 +7,11 @@ import { BaseLayout } from '@layouts/index';
 import { Button } from '@components/atoms';
 import { FormField } from '@components/molecules';
 import { useCreatePost } from '@hooks/api';
+import { useToast } from '@hooks/common';
 
 export default function PostWrite(): ReactElement {
   const router = useRouter();
+  const { showSuccess, showError } = useToast();
 
   // TanStack Query Mutation
   const { mutate: createPost, isPending } = useCreatePost();
@@ -18,7 +20,7 @@ export default function PostWrite(): ReactElement {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    author: '홍길동', // 실제로는 로그인 사용자 정보
+    author: '홍길동',
   });
 
   // 입력 핸들러
@@ -39,27 +41,26 @@ export default function PostWrite(): ReactElement {
       e.preventDefault();
 
       if (!formData.title.trim()) {
-        alert('제목을 입력해주세요.');
+        showError('제목을 입력해주세요.');
         return;
       }
 
       if (!formData.content.trim()) {
-        alert('내용을 입력해주세요.');
+        showError('내용을 입력해주세요.');
         return;
       }
 
-      // API 호출
       createPost(formData, {
         onSuccess: (response) => {
-          alert(response.message);
+          showSuccess(response.message);
           router.push('/posts');
         },
         onError: (error) => {
-          alert(`등록 실패: ${error.message}`);
+          showError(`등록 실패: ${error.message}`);
         },
       });
     },
-    [formData, createPost, router]
+    [formData, createPost, router, showSuccess, showError]
   );
 
   // 취소 핸들러
